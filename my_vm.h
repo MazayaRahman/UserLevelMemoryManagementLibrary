@@ -19,7 +19,7 @@
 typedef unsigned long pte_t;
 
 // Represents a page directory entry
-typedef unsigned long pde_t;
+typedef pte_t* pde_t;
 
 #define TLB_SIZE 120
 

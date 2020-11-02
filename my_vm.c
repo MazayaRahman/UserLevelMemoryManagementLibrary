@@ -1,7 +1,17 @@
 #include "my_vm.h"
 #include "math.h"
+#include <stdio.h>
+
+int init = 0;
 
 int* vBitMap;
+int* pBitMap;
+char* memory;
+long numVP;
+long numPP;
+double offBits;
+
+pde_t* pgdir;
 /*
 Function responsible for allocating and setting your physical memory 
 */
@@ -9,19 +19,31 @@ void SetPhysicalMem() {
 
     //Allocate physical memory using mmap or malloc; this is the total size of
     //your memory you are simulating
+    printf("INITIALIZING LIBRARY\n");
+    memory = malloc(sizeof(char)* MEMSIZE);
 
     
     //HINT: Also calculate the number of physical and virtual pages and allocate
     //virtual and physical bitmaps and initialize them
 
-    double p = log2(PGSIZE); //offset bits based on pagesize
-    long numVP = pow(2,32) / pow(2,p); //# of virtual pages
+    offBits = log2(PGSIZE); //offset bits based on pagesize
+    numVP = MAX_MEMSIZE / PGSIZE; //# of virtual pages
+    numPP = MEMSIZE / PGSIZE; //# of physical pages
 
-    vBitMap = (int*) malloc(sizeof(int)); //initialize virtual bitmap
+    vBitMap = (int*) malloc(sizeof(int) * numVP); //initialize virtual bitmap
     for(int i = 0; i < numVP; i++){
         vBitMap[i] = 0;
     }
 
+    pBitMap = (int*) malloc(sizeof(int) * numPP); //initialize physical bitmap
+    for(int i = 0; i < numVP; i++){
+        pBitMap[i] = 0;
+    }
+
+    //initialize pg dir
+    //how many entries in pgdir? = 2^pgdrBits
+    int pgdrBits = (32-offBits)/2;
+    pgdir = malloc(sizeof(pgdir)*pow(2,pgdrBits));
 }
 
 
@@ -73,11 +95,17 @@ and used by the benchmark
 void *myalloc(unsigned int num_bytes) {
 
     //HINT: If the physical memory is not yet initialized, then allocate and initialize.
+    if(init == 0){
+        SetPhysicalMem();
+        init = 1;
+    }
 
    /* HINT: If the page directory is not initialized, then initialize the
    page directory. Next, using get_next_avail(), check if there are free pages. If
    free pages are available, set the bitmaps and map a new page. Note, you will 
    have to mark which physical pages are used. */
+
+   int pagesNeeded = num_bytes/PGSIZE;
 
     return NULL;
 }
