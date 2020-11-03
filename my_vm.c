@@ -11,6 +11,9 @@ long numVP;
 long numPP;
 double offBits;
 
+int PG_DIR_MASK = 255;
+int PG_TBL_MASK = 255;
+
 pde_t* pgdir;
 /*
 Function responsible for allocating and setting your physical memory 
@@ -42,8 +45,13 @@ void SetPhysicalMem() {
 
     //initialize pg dir
     //how many entries in pgdir? = 2^pgdrBits
-    int pgdrBits = (32-offBits)/2;
+    int pgdrBits = (32-offBits)/2; //10
     pgdir = malloc(sizeof(pgdir)*pow(2,pgdrBits));
+
+    int pgtblBits = 32-pgdrBits-offBits; //10
+    PG_DIR_MASK = PG_DIR_MASK << (32-pgdrBits);
+    PG_TBL_MASK = PG_TBL_MASK << (32-pgtblBits);
+    PG_TBL_MASK = PG_TBL_MASK >> pgdrBits;
 }
 
 
@@ -56,6 +64,18 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     //HINT: Get the Page directory index (1st level) Then get the
     //2nd-level-page table index using the virtual address.  Using the page
     //directory index and page table index get the physical address
+
+    int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
+    if(pgdir[pgDirIndex] == NULL){
+        return NULL;
+    }else{
+        pte_t* currTable = pgdir[pgDirIndex];
+        int pgTblIndex = ((int)va & PG_TBL_MASK);
+        pte_t* currAddr = currTable[pgTblIndex];
+        //ADD OFFSET?
+        return currAddr;
+    }
+
 
 
     //If translation not successfull
@@ -86,6 +106,35 @@ PageMap(pde_t *pgdir, void *va, void *pa)
 void *get_next_avail(int num_pages) {
  
     //Use virtual address bitmap to find the next free page
+    //go through virtual bitmap to find pages
+   int found = 0;
+   int count = 0;
+   int first = 0;
+    printf("Looking for pages, pages needed: %d, numVP: %d\n", num_pages, numVP);
+   for(int i = 0; i < numVP; i++){
+        if(vBitMap[i] == 0){
+            if(count == 0) first = i;
+            count++;
+            if(count == num_pages){
+                //your done
+                printf("pages found in vm\n");
+                found = 1;
+                break;
+            }
+        }else{
+            count = 0;
+        }
+    }
+
+    if(found = 1){
+        //need to return the first va
+        //first is ur vpn
+        void* virtAddr = (first+1)*PGSIZE;
+        return virtAddr;
+    }
+    else{
+        return NULL;
+    }
 }
 
 
@@ -104,8 +153,20 @@ void *myalloc(unsigned int num_bytes) {
    page directory. Next, using get_next_avail(), check if there are free pages. If
    free pages are available, set the bitmaps and map a new page. Note, you will 
    have to mark which physical pages are used. */
+    printf("bytes wanted %d", num_bytes);
+   double pagesNeeded = ceil(num_bytes/PGSIZE)+1; //TODO: it keeps rounding down, fix later
+   printf("pages needed %f\n", pagesNeeded);
 
-   int pagesNeeded = num_bytes/PGSIZE;
+   void* currVA = get_next_avail((int)pagesNeeded);
+   if(currVA == NULL){
+       printf("Not enough memory\n");
+   }else{
+       printf("vm found! at %p\n", currVA);
+   }
+
+   //MAP to physical memory
+
+   
 
     return NULL;
 }

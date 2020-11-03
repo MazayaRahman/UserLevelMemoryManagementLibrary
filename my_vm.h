@@ -16,7 +16,7 @@
 #define MEMSIZE 1024*1024*1024
 
 // Represents a page table entry
-typedef unsigned long pte_t;
+typedef void* pte_t;
 
 // Represents a page directory entry
 typedef pte_t* pde_t;
