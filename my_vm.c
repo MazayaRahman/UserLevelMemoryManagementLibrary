@@ -54,6 +54,29 @@ void SetPhysicalMem() {
     PG_TBL_MASK = PG_TBL_MASK >> pgdrBits;
 }
 
+int
+add_TLB(void *va, void *pa)
+{
+
+    /*Part 2 HINT: Add a virtual to physical page translation to the TLB */
+
+    return -1;
+}
+
+pte_t *
+check_TLB(void *va) {
+
+    /* Part 2: TLB lookup code here */
+
+}
+
+
+void print_TLB_missrate(){
+  double miss_rate = 0;
+
+
+  fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
+}
 
 
 /*
