@@ -263,6 +263,12 @@ void myfree(void *va, int size) {
     //Free the page table entries starting from this virtual address (va)
     // Also mark the pages free in the bitmap
     //Only free if the memory from "va" to va+size is valid
+
+    // 1. use size to see how many pages would need to be freed -> count
+    // 2. use va to get pgdir index, and pg table index
+    // 3. for count pages, get va and go to that entry in pg table and null it out
+    // 4. 0 the corresponding entries in both bitmaps
+    // 5. rmbr to increment ppCount when freeing phsysical pages.
 }
 
 
