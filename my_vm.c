@@ -1,5 +1,5 @@
 #include "my_vm.h"
-#include "math.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -15,6 +15,7 @@ long ppCount;
 
 int pgdrBits;
 int pgtblBits;
+int offset = 0XFFFFFFFFF;
 
 unsigned int PG_DIR_MASK = 0XFFFFFFFF;
 unsigned int PG_TBL_MASK = 0XFFFFFFFF;
@@ -36,6 +37,7 @@ void SetPhysicalMem() {
     //virtual and physical bitmaps and initialize them
 
     offBits = log2(PGSIZE); //offset bits based on pagesize
+    offset = offset >>(32 - offBits); //offset bits as an int
     numVP = MAX_MEMSIZE / PGSIZE; //# of virtual pages
     numPP = MEMSIZE / PGSIZE; //# of physical pages
     ppCount = numPP;
@@ -111,7 +113,8 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     }else{
         pte_t* currTable = pgdir[pgDirIndex];
         int pgTblIndex = ((int)va & PG_TBL_MASK);
-        pte_t* currAddr = currTable[pgTblIndex];
+        void * currAddr = currTable[pgTblIndex];
+        currAddr = currAddr + offset; //adding offset bits to the current addr
         //ADD OFFSET?
         return currAddr;
     }
@@ -222,6 +225,7 @@ void *myalloc(unsigned int num_bytes) {
    }
 
    //MAP to physical memory
+   void * ptrva = currVA;
    if(ppCount < pagesNeeded){
        return NULL;
    }else{
@@ -229,22 +233,23 @@ void *myalloc(unsigned int num_bytes) {
            void* currPA = get_next_avail_phys(1);
            printf("pm found! at %p\n", currPA);
 
-           currVA = (int)currVA * i;
+           //currVA = (int)currVA * i;
+           ptrva=  currVA + (i * PGSIZE);
 
            //TRANSLATE VA TO GET INDEX..? Map it with PA (using pagemap()?)
-           int pgDirIndex = ((int)currVA & PG_DIR_MASK);
+           int pgDirIndex = ((int)ptrva & PG_DIR_MASK);
            printf("pgdir: %d\n", pgDirIndex);
            if(pgdir[pgDirIndex] == NULL){
                //need to allocate a page table
                pgdir[pgDirIndex] = malloc(sizeof(pte_t)*pow(2,pgtblBits));
            }
            pte_t* currTable = pgdir[pgDirIndex];
-           int pgTblIndex = ((unsigned int)currVA & PG_TBL_MASK);
+           int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
            printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
-           currTable[pgTblIndex] = currPA;
+           currTable[pgTblIndex] = ptrva;
            printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
 
-           int vBMIndex = (int)currVA / PGSIZE;
+           int vBMIndex = (int)ptrva / PGSIZE;
            printf("v bitmapindex to update: %d\n", vBMIndex);
            vBitMap[vBMIndex] = 1; //in use
 
@@ -276,17 +281,60 @@ void myfree(void *va, int size) {
  * memory pages using virtual address (va)
 */
 void PutVal(void *va, void *val, int size) {
+ int numPages = 1;
+    if(size > PGSIZE){
+     numPages = ceil(size / PGSIZE)+1;
+     }
+     void * vaptr = va;
+     void * valptr = val;
+    for(int i = 0; i< numPages; i++){
+        vaptr = va +(PGSIZE* i);
+        valptr = val+(PGSIZE * i); //CONFIRM THIS??
+        void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
+       if(size > PGSIZE){
+        memcpy(phyAddr, valptr, PGSIZE);
+        }else{
+        memcpy(phyAddr, valptr, size);
+        }
+     }
+
+
+
+    //first check if the size is larger than the pageSize.
+    //if it then see how many pages that is.
+    //use translate to map each page from VA to PA.
+
+
 
     /* HINT: Using the virtual address and Translate(), find the physical page. Copy
        the contents of "val" to a physical page. NOTE: The "size" value can be larger
        than one page. Therefore, you may have to find multiple pages using Translate()
        function.*/
+      // 1. Locate the physical page.
+
 
 }
 
 
 /*Given a virtual address, this function copies the contents of the page to val*/
 void GetVal(void *va, void *val, int size) {
+int numPages = 1;
+ if(size > PGSIZE){
+  numPages = size/ PGSIZE;
+ }
+ for(int i =0; i<numPages; i++){
+    void * vaptr =va + (i * PGSIZE);
+    void * valptr = val + (i*PGSIZE);
+    void * phyAddr = Translate(pgdir, vaptr);
+    if(size > PGSIZE){
+     memcpy(valptr, phyAddr, PGSIZE);
+    }else{
+    memcpy(valptr, phyAddr, size);
+    }
+
+
+ }
+
 
     /* HINT: put the values pointed to by "va" inside the physical memory at given
     "val" address. Assume you can access "val" directly by derefencing them.
