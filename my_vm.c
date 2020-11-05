@@ -1,6 +1,7 @@
 #include "my_vm.h"
 #include "math.h"
 #include <stdio.h>
+#include <stdint.h>
 
 int init = 0;
 
@@ -9,10 +10,14 @@ int* pBitMap;
 char* memory;
 long numVP;
 long numPP;
-double offBits;
+int offBits;
+long ppCount;
 
-int PG_DIR_MASK = 255;
-int PG_TBL_MASK = 255;
+int pgdrBits;
+int pgtblBits;
+
+unsigned int PG_DIR_MASK = 0XFFFFFFFF;
+unsigned int PG_TBL_MASK = 0XFFFFFFFF;
 
 pde_t* pgdir;
 /*
@@ -24,6 +29,7 @@ void SetPhysicalMem() {
     //your memory you are simulating
     printf("INITIALIZING LIBRARY\n");
     memory = malloc(sizeof(char)* MEMSIZE);
+    printf("pm start at %p\n", memory);
 
     
     //HINT: Also calculate the number of physical and virtual pages and allocate
@@ -32,6 +38,7 @@ void SetPhysicalMem() {
     offBits = log2(PGSIZE); //offset bits based on pagesize
     numVP = MAX_MEMSIZE / PGSIZE; //# of virtual pages
     numPP = MEMSIZE / PGSIZE; //# of physical pages
+    ppCount = numPP;
 
     vBitMap = (int*) malloc(sizeof(int) * numVP); //initialize virtual bitmap
     for(int i = 0; i < numVP; i++){
@@ -45,13 +52,23 @@ void SetPhysicalMem() {
 
     //initialize pg dir
     //how many entries in pgdir? = 2^pgdrBits
-    int pgdrBits = (32-offBits)/2; //10
-    pgdir = malloc(sizeof(pgdir)*pow(2,pgdrBits));
+    pgdrBits = (32-offBits)/2; //10
+    pgdir = malloc(sizeof(pde_t)*pow(2,pgdrBits));
 
-    int pgtblBits = 32-pgdrBits-offBits; //10
+    pgtblBits = 32-pgdrBits-offBits; //10
     PG_DIR_MASK = PG_DIR_MASK << (32-pgdrBits);
-    PG_TBL_MASK = PG_TBL_MASK << (32-pgtblBits);
-    PG_TBL_MASK = PG_TBL_MASK >> pgdrBits;
+    printf("pgdir mask: %d\n", PG_DIR_MASK);
+
+    unsigned int dirMaskFlip = ~PG_DIR_MASK;
+    printf("initial mask: %d\n", PG_TBL_MASK);
+    PG_TBL_MASK = PG_TBL_MASK << offBits;
+    PG_TBL_MASK = dirMaskFlip & PG_TBL_MASK;
+    printf("final masl: %d\n", PG_TBL_MASK);
+    
+    //PG_TBL_MASK = PG_TBL_MASK << (32-pgtblBits);
+    
+    //PG_TBL_MASK = (PG_TBL_MASK >> pgdrBits) & (PG_DIR_MASK >> pgdrBits);
+    //printf("shift left: %d\n", PG_TBL_MASK);
 }
 
 int
@@ -134,7 +151,7 @@ void *get_next_avail(int num_pages) {
    int count = 0;
    int first = 0;
     printf("Looking for pages, pages needed: %d, numVP: %d\n", num_pages, numVP);
-   for(int i = 0; i < numVP; i++){
+   for(int i = 1; i < numVP; i++){
         if(vBitMap[i] == 0){
             if(count == 0) first = i;
             count++;
@@ -152,12 +169,29 @@ void *get_next_avail(int num_pages) {
     if(found = 1){
         //need to return the first va
         //first is ur vpn
-        void* virtAddr = (first+1)*PGSIZE;
+        void* virtAddr = (first)*PGSIZE;;
+       
+        
         return virtAddr;
     }
     else{
         return NULL;
     }
+}
+
+void *get_next_avail_phys(int num_pages) {
+    int i;
+    for(i = 1; i < numPP; i++){
+        if(pBitMap[i] == 0){
+            break;
+        }
+    }
+
+    // ith page is free
+    void* physAddr = i*(PGSIZE) + memory;
+    pBitMap[i] = 1; //now it's in use
+    ppCount--;
+    return physAddr;
 }
 
 
@@ -188,6 +222,34 @@ void *myalloc(unsigned int num_bytes) {
    }
 
    //MAP to physical memory
+   if(ppCount < pagesNeeded){
+       return NULL;
+   }else{
+       for(int i = 1; i <= pagesNeeded; i++){
+           void* currPA = get_next_avail_phys(1);
+           printf("pm found! at %p\n", currPA);
+
+           currVA = (int)currVA * i;
+
+           //TRANSLATE VA TO GET INDEX..? Map it with PA (using pagemap()?)
+           int pgDirIndex = ((int)currVA & PG_DIR_MASK);
+           printf("pgdir: %d\n", pgDirIndex);
+           if(pgdir[pgDirIndex] == NULL){
+               //need to allocate a page table
+               pgdir[pgDirIndex] = malloc(sizeof(pte_t)*pow(2,pgtblBits));
+           }
+           pte_t* currTable = pgdir[pgDirIndex];
+           int pgTblIndex = ((unsigned int)currVA & PG_TBL_MASK);
+           printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
+           currTable[pgTblIndex] = currPA;
+           printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
+
+           int vBMIndex = (int)currVA / PGSIZE;
+           printf("v bitmapindex to update: %d\n", vBMIndex);
+           vBitMap[vBMIndex] = 1; //in use
+
+       }
+   }
 
    
 
