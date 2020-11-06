@@ -140,6 +140,21 @@ PageMap(pde_t *pgdir, void *va, void *pa)
     and page table (2nd-level) indices. If no mapping exists, set the
     virtual to physical mapping */
 
+    int pgDirIndex = ((int)va & PG_DIR_MASK);
+    printf("pgdir: %d\n", pgDirIndex);
+    if(pgdir[pgDirIndex] == NULL){
+        //need to allocate a page table
+        pgdir[pgDirIndex] = malloc(sizeof(pte_t)*pow(2,pgtblBits));
+    }
+    pte_t* currTable = pgdir[pgDirIndex];
+
+    int pgTblIndex = ((unsigned int)va & PG_TBL_MASK);
+    printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
+    currTable[pgTblIndex] = pa;
+    printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
+
+
+
     return -1;
 }
 
@@ -202,7 +217,7 @@ void *get_next_avail_phys(int num_pages) {
 and used by the benchmark
 */
 void *myalloc(unsigned int num_bytes) {
-
+    printf("MYALLOC CALLED\n");
     //HINT: If the physical memory is not yet initialized, then allocate and initialize.
     if(init == 0){
         SetPhysicalMem();
@@ -229,7 +244,7 @@ void *myalloc(unsigned int num_bytes) {
    if(ppCount < pagesNeeded){
        return NULL;
    }else{
-       for(int i = 1; i <= pagesNeeded; i++){
+       for(int i = 0; i < pagesNeeded; i++){
            void* currPA = get_next_avail_phys(1);
            printf("pm found! at %p\n", currPA);
 
@@ -237,17 +252,8 @@ void *myalloc(unsigned int num_bytes) {
            ptrva=  currVA + (i * PGSIZE);
 
            //TRANSLATE VA TO GET INDEX..? Map it with PA (using pagemap()?)
-           int pgDirIndex = ((int)ptrva & PG_DIR_MASK);
-           printf("pgdir: %d\n", pgDirIndex);
-           if(pgdir[pgDirIndex] == NULL){
-               //need to allocate a page table
-               pgdir[pgDirIndex] = malloc(sizeof(pte_t)*pow(2,pgtblBits));
-           }
-           pte_t* currTable = pgdir[pgDirIndex];
-           int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
-           printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
-           currTable[pgTblIndex] = ptrva;
-           printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
+
+           PageMap(pgdir, ptrva, currPA);
 
            int vBMIndex = (int)ptrva / PGSIZE;
            printf("v bitmapindex to update: %d\n", vBMIndex);
@@ -258,7 +264,7 @@ void *myalloc(unsigned int num_bytes) {
 
    
 
-    return NULL;
+    return currVA;
 }
 
 /* Responsible for releasing one or more memory pages using virtual address (va)
@@ -274,6 +280,52 @@ void myfree(void *va, int size) {
     // 3. for count pages, get va and go to that entry in pg table and null it out
     // 4. 0 the corresponding entries in both bitmaps
     // 5. rmbr to increment ppCount when freeing phsysical pages.
+    printf("VA to free %p\n", va);
+    if((int)va +size > MAX_MEMSIZE){
+        printf("Invalid free\n");
+        return NULL;
+    }
+
+    printf("bytes to free %d", size);
+    double pagesNeeded = ceil(size/PGSIZE)+1; //TODO: it keeps rounding down, fix later
+    printf("pages to free %f\n", pagesNeeded);
+
+    void * ptrva = va;
+
+    for(int i = 0; i < pagesNeeded; i++){
+        ptrva=  va + (i * PGSIZE);
+
+        int pgDirIndex = ((int)ptrva & PG_DIR_MASK);
+        printf("pgdir: %d\n", pgDirIndex);
+        if(pgdir[pgDirIndex] == NULL){
+            //nothing to free there..
+            return NULL;
+        }
+        pte_t* currTable = pgdir[pgDirIndex];
+
+        int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
+        printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
+        
+        void* currpa = currTable[pgTblIndex];
+        currTable[pgTblIndex] = NULL;
+        //TODO: Do we also have to clear out the space in physical memory, or just let the user overwrite?
+
+        printf("pm unmapped! pgdir: %d, pgtbl: %d previously had %p\n", pgDirIndex, pgTblIndex, currpa);
+
+        int vBMIndex = (int)ptrva / PGSIZE;
+        printf("v bitmapindex to update: %d\n", vBMIndex);
+        vBitMap[vBMIndex] = 0; //now free
+
+        int pBMIndex = ((int)currpa - (int)memory)/PGSIZE;
+        printf("p bitmapindex to update: %d\n", pBMIndex);
+        pBitMap[pBMIndex] = 0; //now free
+        ppCount++;
+
+    }
+
+
+
+
 }
 
 
@@ -281,6 +333,11 @@ void myfree(void *va, int size) {
  * memory pages using virtual address (va)
 */
 void PutVal(void *va, void *val, int size) {
+    printf("PUTVAL\n");
+    printf("the va passed: %p\n", va);
+    int v = (int)val;
+    printf("the val passed: %d\n", v);
+    printf("the size passed: %d\n", size);
  int numPages = 1;
     if(size > PGSIZE){
      numPages = ceil(size / PGSIZE)+1;
@@ -291,6 +348,7 @@ void PutVal(void *va, void *val, int size) {
         vaptr = va +(PGSIZE* i);
         valptr = val+(PGSIZE * i); //CONFIRM THIS??
         void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
+        printf("phys addr translated to %p\n", phyAddr);
        if(size > PGSIZE){
         memcpy(phyAddr, valptr, PGSIZE);
         }else{
@@ -320,7 +378,7 @@ void PutVal(void *va, void *val, int size) {
 void GetVal(void *va, void *val, int size) {
 int numPages = 1;
  if(size > PGSIZE){
-  numPages = size/ PGSIZE;
+  numPages = ceil(size/ PGSIZE)+1;
  }
  for(int i =0; i<numPages; i++){
     void * vaptr =va + (i * PGSIZE);

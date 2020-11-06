@@ -25,6 +25,8 @@ int main() {
         for (j = 0; j < SIZE; j++) {
             address_a = (unsigned int)a + ((i * SIZE * sizeof(int))) + (j * sizeof(int));
             address_b = (unsigned int)b + ((i * SIZE * sizeof(int))) + (j * sizeof(int));
+            printf("addr_a is %d\n", address_a);
+            printf("addr_b is %d\n", address_b);
             PutVal((void *)address_a, &x, sizeof(int));
             PutVal((void *)address_b, &x, sizeof(int));
         }
