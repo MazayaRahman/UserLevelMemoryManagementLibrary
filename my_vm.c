@@ -15,7 +15,7 @@ long ppCount;
 
 int pgdrBits;
 int pgtblBits;
-int offset = 0XFFFFFFFFF;
+int offset = 0XFFFFFFFF;
 
 unsigned int PG_DIR_MASK = 0XFFFFFFFF;
 unsigned int PG_TBL_MASK = 0XFFFFFFFF;
@@ -37,7 +37,10 @@ void SetPhysicalMem() {
     //virtual and physical bitmaps and initialize them
 
     offBits = log2(PGSIZE); //offset bits based on pagesize
-    offset = offset >>(32 - offBits); //offset bits as an int
+    offset = offset <<  offBits; //offset bits as an int
+    offset = ~offset;
+    printf("the offset mask is %d\n", offset);
+     
     numVP = MAX_MEMSIZE / PGSIZE; //# of virtual pages
     numPP = MEMSIZE / PGSIZE; //# of physical pages
     ppCount = numPP;
@@ -106,16 +109,20 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     //HINT: Get the Page directory index (1st level) Then get the
     //2nd-level-page table index using the virtual address.  Using the page
     //directory index and page table index get the physical address
-
+    
+    //printf("IN TRANSLATE\n");
     int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
+    //printf("dir index: %d\n", pgDirIndex);
     if(pgdir[pgDirIndex] == NULL){
         return NULL;
     }else{
         pte_t* currTable = pgdir[pgDirIndex];
-        int pgTblIndex = ((int)va & PG_TBL_MASK);
+        int pgTblIndex = ((int)va & PG_TBL_MASK) >> offBits;
+        //printf("table index: %d\n", pgTblIndex);
         void * currAddr = currTable[pgTblIndex];
-        currAddr = currAddr + offset; //adding offset bits to the current addr
-        //ADD OFFSET?
+        void* offToAdd = (int)va & offset;
+        //printf("offbits of va %d\n", offToAdd);
+        currAddr = currAddr + (int)offToAdd; //adding offset bits to the current addr
         return currAddr;
     }
 
@@ -148,7 +155,7 @@ PageMap(pde_t *pgdir, void *va, void *pa)
     }
     pte_t* currTable = pgdir[pgDirIndex];
 
-    int pgTblIndex = ((unsigned int)va & PG_TBL_MASK);
+    int pgTblIndex = ((unsigned int)va & PG_TBL_MASK) >> offBits;
     printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
     currTable[pgTblIndex] = pa;
     printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
@@ -228,8 +235,9 @@ void *myalloc(unsigned int num_bytes) {
    page directory. Next, using get_next_avail(), check if there are free pages. If
    free pages are available, set the bitmaps and map a new page. Note, you will 
    have to mark which physical pages are used. */
-    printf("bytes wanted %d", num_bytes);
-   double pagesNeeded = ceil(num_bytes/PGSIZE)+1; //TODO: it keeps rounding down, fix later
+    printf("bytes wanted %d\n", num_bytes);
+
+   float pagesNeeded = ceil((float)num_bytes/(float)PGSIZE); //TODO: it keeps rounding down, fix later
    printf("pages needed %f\n", pagesNeeded);
 
    void* currVA = get_next_avail((int)pagesNeeded);
@@ -287,7 +295,7 @@ void myfree(void *va, int size) {
     }
 
     printf("bytes to free %d", size);
-    double pagesNeeded = ceil(size/PGSIZE)+1; //TODO: it keeps rounding down, fix later
+    double pagesNeeded = ceil((float)size/(float)PGSIZE); //TODO: it keeps rounding down, fix later
     printf("pages to free %f\n", pagesNeeded);
 
     void * ptrva = va;
@@ -333,14 +341,14 @@ void myfree(void *va, int size) {
  * memory pages using virtual address (va)
 */
 void PutVal(void *va, void *val, int size) {
-    printf("PUTVAL\n");
-    printf("the va passed: %p\n", va);
+    //printf("PUTVAL\n");
+    //printf("the va passed: %p\n", va);
     int v = (int)val;
-    printf("the val passed: %d\n", v);
-    printf("the size passed: %d\n", size);
- int numPages = 1;
+    //printf("the val passed: %d\n", v);
+    //printf("the size passed: %d\n", size);
+    int numPages = 1;
     if(size > PGSIZE){
-     numPages = ceil(size / PGSIZE)+1;
+     numPages = ceil((float)size/(float)PGSIZE);;
      }
      void * vaptr = va;
      void * valptr = val;
@@ -348,7 +356,7 @@ void PutVal(void *va, void *val, int size) {
         vaptr = va +(PGSIZE* i);
         valptr = val+(PGSIZE * i); //CONFIRM THIS??
         void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
-        printf("phys addr translated to %p\n", phyAddr);
+        //printf("phys addr translated to %p\n", phyAddr);
        if(size > PGSIZE){
         memcpy(phyAddr, valptr, PGSIZE);
         }else{
@@ -378,7 +386,7 @@ void PutVal(void *va, void *val, int size) {
 void GetVal(void *va, void *val, int size) {
 int numPages = 1;
  if(size > PGSIZE){
-  numPages = ceil(size/ PGSIZE)+1;
+  numPages = ceil((float)size/(float)PGSIZE);
  }
  for(int i =0; i<numPages; i++){
     void * vaptr =va + (i * PGSIZE);
