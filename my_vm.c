@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
-
+#include <string.h>
 int init = 0;
 
 int* vBitMap;
@@ -16,7 +16,7 @@ long ppCount;
 int pgdrBits;
 int pgtblBits;
 int offset = 0XFFFFFFFFF;
-
+int address_a =0, address_b =0;
 unsigned int PG_DIR_MASK = 0XFFFFFFFF;
 unsigned int PG_TBL_MASK = 0XFFFFFFFF;
 
@@ -409,6 +409,10 @@ This function receives two matrices mat1 and mat2 as an argument with size
 argument representing the number of rows and columns. After performing matrix
 multiplication, copy the result to answer.
 */
+int element;
+int element1;
+void *  e;
+int ans;
 void MatMult(void *mat1, void *mat2, int size, void *answer) {
 
     /* Hint: You will index as [i * size + j] where  "i, j" are the indices of the
@@ -417,5 +421,59 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     getting the values from two matrices, you will perform multiplication and 
     store the result to the "answer array"*/
 
+
+
+  printf("Inside the matmul function\n");
+  for(int i =0; i< size; i++){
+     for(int j =0; j<size; j++){
+       //PutVal(0, answer, sizeof(int));
+       for(int k =0; k <size; k++){
+	 GetVal(answer+(i*size +j),(int) &e, sizeof(int));
+	 GetVal(mat1+(i*size + k), &element, sizeof(int));
+	 printf("FIRST VALUE RECORDED %d\n", element);
+	 GetVal(mat2 +(k*size +j), &element1, sizeof(int));
+	 
+	 ans = e + (element*element1);
+	 //printf("first mat mul %d\n", ans);
+	  PutVal(answer+(i*size+j), ans, sizeof(int));
+       }
        
+     }
+    
+  }
+   printf(" mat mul %d\n", ans);
+     printf("Printing the copied array\n");
+  for(int k =0; k <size; k++){
+   for(int l =0; l <size; l++){
+     printf("%d ", element+(k*size+l));
+   }
+   printf("\n");
+  }
+
+  for(int r =0; r<size;r++){
+    for(int s=0;s<size;s++){
+      printf("%d ", element1+(r*size+s));
+    }
+    printf("\n");
+  }
+  
+  /*
+  for(int k = 0; k<size; k++){
+    for(int l = 0; l<size; l++){
+      for(int m =0; m<size;m++){
+	*(answer+(k*size+l)) = *(element+(k*size+m)) * *(element1+(m*size+l));
+      }
+    }
+  }
+
+  printf("Testing the multiplication product\n");
+
+  for(int r =0; r<size;r++){
+    for(int s =0; s<size;s++){
+      printf("%d ", answer+(r*size+s));
+    }
+    printf("\n");
+  }
+  */
+
 }
