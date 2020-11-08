@@ -2,8 +2,12 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+<<<<<<< HEAD
 //#include <string.h>
 
+=======
+#include <string.h>
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
 int init = 0;
 
 int* vBitMap;
@@ -16,8 +20,13 @@ long ppCount;
 
 int pgdrBits;
 int pgtblBits;
+<<<<<<< HEAD
 int offset = 0XFFFFFFFF;
 
+=======
+int offset = 0XFFFFFFFFF;
+int address_a =0, address_b =0;
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
 unsigned int PG_DIR_MASK = 0XFFFFFFFF;
 unsigned int PG_TBL_MASK = 0XFFFFFFFF;
 
@@ -427,7 +436,11 @@ multiplication, copy the result to answer.
 */
 int element;
 int element1;
+<<<<<<< HEAD
 int e;
+=======
+void *  e;
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
 int ans;
 void MatMult(void *mat1, void *mat2, int size, void *answer) {
 
@@ -437,6 +450,7 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     getting the values from two matrices, you will perform multiplication and 
     store the result to the "answer array"*/
 
+<<<<<<< HEAD
 printf("Inside the matmul function\n");
   for(int i =0; i< size; i++){
      for(int j =0; j<size; j++){
@@ -453,11 +467,29 @@ printf("Inside the matmul function\n");
 	 printf("first mat mul %d\n", ans);
 	PutVal(answer+(i*size+j), &ans, sizeof(int));
 	 // memcpy(answer+(i*size+j), ans, sizeof(int));
+=======
+
+
+  printf("Inside the matmul function\n");
+  for(int i =0; i< size; i++){
+     for(int j =0; j<size; j++){
+       //PutVal(0, answer, sizeof(int));
+       for(int k =0; k <size; k++){
+	 GetVal(answer+(i*size +j),(int) &e, sizeof(int));
+	 GetVal(mat1+(i*size + k), &element, sizeof(int));
+	 printf("FIRST VALUE RECORDED %d\n", element);
+	 GetVal(mat2 +(k*size +j), &element1, sizeof(int));
+	 
+	 ans = e + (element*element1);
+	 //printf("first mat mul %d\n", ans);
+	  PutVal(answer+(i*size+j), ans, sizeof(int));
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
        }
        
      }
     
   }
+<<<<<<< HEAD
 
   printf("THE ANSWER MATRIX\n");
 
@@ -471,18 +503,50 @@ printf("Inside the matmul function\n");
   /*
   //printf(" mat mul %d\n", ans);
      printf("Printing the copied mat1\n");
+=======
+   printf(" mat mul %d\n", ans);
+     printf("Printing the copied array\n");
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
   for(int k =0; k <size; k++){
    for(int l =0; l <size; l++){
      printf("%d ", element+(k*size+l));
    }
    printf("\n");
   }
+<<<<<<< HEAD
   printf("Printing themat2\n");
+=======
+
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
   for(int r =0; r<size;r++){
     for(int s=0;s<size;s++){
       printf("%d ", element1+(r*size+s));
     }
     printf("\n");
+<<<<<<< HEAD
   } 
   */      
+=======
+  }
+  
+  /*
+  for(int k = 0; k<size; k++){
+    for(int l = 0; l<size; l++){
+      for(int m =0; m<size;m++){
+	*(answer+(k*size+l)) = *(element+(k*size+m)) * *(element1+(m*size+l));
+      }
+    }
+  }
+
+  printf("Testing the multiplication product\n");
+
+  for(int r =0; r<size;r++){
+    for(int s =0; s<size;s++){
+      printf("%d ", answer+(r*size+s));
+    }
+    printf("\n");
+  }
+  */
+
+>>>>>>> 80783fbdafbb3ab17b656a95ad252f96ae565f35
 }
