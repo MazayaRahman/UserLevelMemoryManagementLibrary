@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+//#include <string.h>
 
 int init = 0;
 
@@ -110,7 +111,7 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     //2nd-level-page table index using the virtual address.  Using the page
     //directory index and page table index get the physical address
     
-    //printf("IN TRANSLATE\n");
+  // printf("IN TRANSLATE\n");
     int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
     //printf("dir index: %d\n", pgDirIndex);
     if(pgdir[pgDirIndex] == NULL){
@@ -118,16 +119,18 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     }else{
         pte_t* currTable = pgdir[pgDirIndex];
         int pgTblIndex = ((int)va & PG_TBL_MASK) >> offBits;
-        //printf("table index: %d\n", pgTblIndex);
+	// printf("table index: %d\n", pgTblIndex);
         void * currAddr = currTable[pgTblIndex];
         void* offToAdd = (int)va & offset;
-        //printf("offbits of va %d\n", offToAdd);
+	// printf("offbits of va %d\n", offToAdd);
         currAddr = currAddr + (int)offToAdd; //adding offset bits to the current addr
+	//	printf("added offbits to curradd\n");
+	
         return currAddr;
     }
 
 
-
+    printf("Translation not successfull\n");
     //If translation not successfull
     return NULL; 
 }
@@ -341,11 +344,11 @@ void myfree(void *va, int size) {
  * memory pages using virtual address (va)
 */
 void PutVal(void *va, void *val, int size) {
-    //printf("PUTVAL\n");
-    //printf("the va passed: %p\n", va);
+  //printf("PUTVAL\n");
+  // printf("the va passed: %p\n", va);
     int v = (int)val;
     //printf("the val passed: %d\n", v);
-    //printf("the size passed: %d\n", size);
+    // printf("the size passed: %d\n", size);
     int numPages = 1;
     if(size > PGSIZE){
      numPages = ceil((float)size/(float)PGSIZE);;
@@ -356,10 +359,11 @@ void PutVal(void *va, void *val, int size) {
         vaptr = va +(PGSIZE* i);
         valptr = val+(PGSIZE * i); //CONFIRM THIS??
         void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
-        //printf("phys addr translated to %p\n", phyAddr);
+	//  printf("phys addr translated to %p\n", phyAddr);
        if(size > PGSIZE){
         memcpy(phyAddr, valptr, PGSIZE);
         }else{
+	 //printf("Before memcpy\n");
         memcpy(phyAddr, valptr, size);
         }
      }
@@ -384,14 +388,18 @@ void PutVal(void *va, void *val, int size) {
 
 /*Given a virtual address, this function copies the contents of the page to val*/
 void GetVal(void *va, void *val, int size) {
+  // printf("Inside getval function\n");
 int numPages = 1;
  if(size > PGSIZE){
   numPages = ceil((float)size/(float)PGSIZE);
+  //printf("No.of pages%d\n",numPages);
  }
  for(int i =0; i<numPages; i++){
     void * vaptr =va + (i * PGSIZE);
     void * valptr = val + (i*PGSIZE);
+    // printf("Before translate in getval\n");
     void * phyAddr = Translate(pgdir, vaptr);
+    // printf("After translate in getval\n");
     if(size > PGSIZE){
      memcpy(valptr, phyAddr, PGSIZE);
     }else{
@@ -417,6 +425,10 @@ This function receives two matrices mat1 and mat2 as an argument with size
 argument representing the number of rows and columns. After performing matrix
 multiplication, copy the result to answer.
 */
+int element;
+int element1;
+int e;
+int ans;
 void MatMult(void *mat1, void *mat2, int size, void *answer) {
 
     /* Hint: You will index as [i * size + j] where  "i, j" are the indices of the
@@ -425,5 +437,52 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     getting the values from two matrices, you will perform multiplication and 
     store the result to the "answer array"*/
 
+printf("Inside the matmul function\n");
+  for(int i =0; i< size; i++){
+     for(int j =0; j<size; j++){
+  
+       // PutVal(0, answer, sizeof(int));
+       for(int k =0; k <size; k++){
+	 printf("First getval\n");
+	 GetVal(answer+(i*size +j),&e, sizeof(int));
+	 GetVal(mat1+(i*size + k), &element, sizeof(int));
+	 printf("FIRST VALUE RECORDED %d\n", element);
+	GetVal(mat2+(k*size +j), &element1, sizeof(int));
+	 
+	ans = e + (element*element1);
+	 printf("first mat mul %d\n", ans);
+	PutVal(answer+(i*size+j), &ans, sizeof(int));
+	 // memcpy(answer+(i*size+j), ans, sizeof(int));
+       }
        
+     }
+    
+  }
+
+  printf("THE ANSWER MATRIX\n");
+
+  for(int r =0; r< size; r++){
+    for(int s =0; s<size;s++){
+      printf("%d ", answer+(r*size+s));
+	}
+	printf("\n");
+    }
+
+  /*
+  //printf(" mat mul %d\n", ans);
+     printf("Printing the copied mat1\n");
+  for(int k =0; k <size; k++){
+   for(int l =0; l <size; l++){
+     printf("%d ", element+(k*size+l));
+   }
+   printf("\n");
+  }
+  printf("Printing themat2\n");
+  for(int r =0; r<size;r++){
+    for(int s=0;s<size;s++){
+      printf("%d ", element1+(r*size+s));
+    }
+    printf("\n");
+  } 
+  */      
 }
