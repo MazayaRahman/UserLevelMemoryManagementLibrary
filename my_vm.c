@@ -361,6 +361,7 @@ void PutVal(void *va, void *val, int size) {
         memcpy(phyAddr, valptr, PGSIZE);
         }else{
         memcpy(phyAddr, valptr, size);
+        //printf("num is %d\n", *(int*)phyAddr);
         }
      }
 
@@ -425,5 +426,63 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     getting the values from two matrices, you will perform multiplication and 
     store the result to the "answer array"*/
 
-       
+
+    int x;
+    printf("matrix 1\n");
+    for(int r =0; r< size; r++){
+        for(int s =0; s<size;s++){
+            //GetVal(mat1+(r*size+s), &x, sizeof(int));
+            GetVal((unsigned int)mat1 + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
+            printf("%d ", x);
+	    }
+	    printf("\n");
+    }
+
+    printf("matrix 2\n");
+    for(int r =0; r< size; r++){
+        for(int s =0; s<size;s++){
+            //GetVal(mat2+(r*size+s), &x, sizeof(int));
+            GetVal((unsigned int)mat2 + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
+            printf("%d ", x);
+	    }
+	    printf("\n");
+    }
+    int zero = 0;
+    int currAnsElement;
+    int m1Element;
+    int m2Element;
+    int ansElement;
+    for(int i =0; i< size; i++){
+        for(int j =0; j<size; j++){
+  
+            //PutVal(answer+(i*size + j), &zero, sizeof(int));
+            PutVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &zero, sizeof(int));
+            for(int k =0; k <size; k++){
+                //GetVal(answer+(i*size + j), &currAnsElement, sizeof(int));
+                GetVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &currAnsElement, sizeof(int));
+                //printf("c %d ", currAnsElement);
+                //GetVal(mat1+(i*size + k), &m1Element, sizeof(int));
+                GetVal((unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int)), &m1Element, sizeof(int));
+                
+                //GetVal(mat2+(k*size + j), &m2Element, sizeof(int));
+                GetVal((unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int)), &m2Element, sizeof(int));
+                ansElement = currAnsElement + (m1Element*m2Element);
+
+                //PutVal(answer+(i*size + j), &ansElement, sizeof(int));
+                PutVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &ansElement, sizeof(int));
+
+            }
+        }
+    }
+
+    printf("ans matrix\n");
+    for(int r =0; r< size; r++){
+        for(int s =0; s<size;s++){
+            //GetVal(answer+(r*size+s), &x, sizeof(int));
+            GetVal((unsigned int)answer + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
+            printf("%d ", x);
+	    }
+	    printf("\n");
+    }
+ 
 }

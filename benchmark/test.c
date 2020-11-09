@@ -29,7 +29,9 @@ int main() {
             //printf("addr_b is %d\n", address_b);
             PutVal((void *)address_a, &x, sizeof(int));
             PutVal((void *)address_b, &x, sizeof(int));
+            printf("%d ", x);
         }
+        printf("\n");
     } 
 
     printf("Fetching matrix elements stored in the arrays\n");
@@ -48,6 +50,9 @@ int main() {
     printf("Performing matrix multiplication with itself!\n");
     MatMult(a, b, SIZE, c);
 
+
+    printf("\n");
+    printf("printing ans from test.c\n");
 
     for (i = 0; i < SIZE; i++) {
         for (j = 0; j < SIZE; j++) {
