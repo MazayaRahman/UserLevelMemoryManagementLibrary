@@ -69,11 +69,10 @@ void SetPhysicalMem() {
     PG_TBL_MASK = PG_TBL_MASK << offBits;
     PG_TBL_MASK = dirMaskFlip & PG_TBL_MASK;
     printf("final masl: %d\n", PG_TBL_MASK);
-    
-    //PG_TBL_MASK = PG_TBL_MASK << (32-pgtblBits);
-    
-    //PG_TBL_MASK = (PG_TBL_MASK >> pgdrBits) & (PG_DIR_MASK >> pgdrBits);
-    //printf("shift left: %d\n", PG_TBL_MASK);
+
+    //Initialize tlb structure
+    tlb_store = malloc(sizeof(struct tlb));
+    tlb_store->count = 0;
 }
 
 int
@@ -316,7 +315,7 @@ void myfree(void *va, int size) {
         
         void* currpa = currTable[pgTblIndex];
         currTable[pgTblIndex] = NULL;
-        //TODO: Do we also have to clear out the space in physical memory, or just let the user overwrite?
+        //TODO: Do we also have to clear out the space in physical memory, or just let the user overwrite? No
 
         printf("pm unmapped! pgdir: %d, pgtbl: %d previously had %p\n", pgDirIndex, pgTblIndex, currpa);
 

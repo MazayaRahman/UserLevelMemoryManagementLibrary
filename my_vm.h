@@ -23,14 +23,22 @@ typedef pte_t* pde_t;
 
 #define TLB_SIZE 120
 
+struct node {
+    void* va;
+    void* pa;
+    struct node *next;
+};
+
 //Structure to represents TLB
 struct tlb {
-
+    struct node* head;
+    struct node* tail;
+    int count;
     //Assume your TLB is a direct mapped TLB of TBL_SIZE (entries)
     // You must also define wth TBL_SIZE in this file.
     //Assume each bucket to be 4 bytes
 };
-struct tlb tlb_store;
+struct tlb* tlb_store;
 
 
 void SetPhysicalMem();
