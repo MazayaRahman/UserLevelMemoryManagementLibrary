@@ -30,6 +30,7 @@ int main() {
             PutVal((void *)address_a, &x, sizeof(int));
             PutVal((void *)address_b, &x, sizeof(int));
             printf("%d ", x);
+            
         }
         printf("\n");
     } 
@@ -67,12 +68,15 @@ int main() {
     myfree(b, 100*4);
     myfree(c, 100*4);
     
+    print_TLB_missrate();
     printf("Checking if allocations were freed!\n");
     a = myalloc(100*4);
     if ((int)a == old_a)
         printf("free function works\n");
     else
         printf("free function does not work\n");
+
+    print_TLB_missrate();
 
     return 0;
 }

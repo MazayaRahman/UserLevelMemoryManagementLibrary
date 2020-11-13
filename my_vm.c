@@ -20,6 +20,9 @@ int offset = 0XFFFFFFFF;
 unsigned int PG_DIR_MASK = 0XFFFFFFFF;
 unsigned int PG_TBL_MASK = 0XFFFFFFFF;
 
+int totalRequests = 0;
+int missRequests = 0;
+
 pde_t* pgdir;
 /*
 Function responsible for allocating and setting your physical memory 
@@ -80,6 +83,42 @@ add_TLB(void *va, void *pa)
 {
 
     /*Part 2 HINT: Add a virtual to physical page translation to the TLB */
+    if(tlb_store->count < TLB_SIZE){
+        struct node* newEntry = malloc(sizeof(struct node));
+
+        if(tlb_store->head == NULL){
+            tlb_store->head = newEntry;
+            tlb_store->tail = newEntry;
+            newEntry->next = NULL;
+        }else{
+            newEntry->next = tlb_store->head;
+            tlb_store->head = newEntry;
+        }
+
+        newEntry->va = va;
+        newEntry->pa = pa;
+
+        tlb_store->count++;
+
+        //printf("Added va %p , pa %p to TLB\n", va, pa);
+    }
+    else{
+        struct node* ptr = tlb_store->head;
+        while(ptr->next != tlb_store->tail){
+            ptr = ptr->next;
+        }
+
+        tlb_store->tail->next = tlb_store->head;
+        tlb_store->head = tlb_store->tail;
+        tlb_store->tail = ptr;
+        ptr->next = NULL;
+
+        tlb_store->head->va = va;
+        tlb_store->head->pa = pa;
+
+        //printf("Added va %p , pa %p to TLB\n", va, pa);
+
+    }
 
     return -1;
 }
@@ -88,12 +127,37 @@ pte_t *
 check_TLB(void *va) {
 
     /* Part 2: TLB lookup code here */
+    //TODO: EXCLUDE OFFBITS WHEN LOOKING?
+    void* vaToSearch = (int)va & (~offset);
+
+
+    struct node* ptr = tlb_store->head;
+    while(ptr != NULL){
+        if(ptr->va == vaToSearch){
+            //found
+            //printf("found mapping for %p in TLB\n", va);
+            totalRequests++;
+            return ptr->pa;
+        }
+        ptr = ptr->next;
+    }
+
+    //not found, must add entry
+    missRequests++;
+    totalRequests++;
+    return NULL;
 
 }
 
 
 void print_TLB_missrate(){
   double miss_rate = 0;
+  printf("total req: %d\n", totalRequests);
+  printf("miss req: %d\n", missRequests);
+
+    
+  miss_rate = (float)missRequests/(float)totalRequests;
+  printf("MISS RATE %f\n", miss_rate);
 
 
   fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
@@ -109,6 +173,19 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     //2nd-level-page table index using the virtual address.  Using the page
     //directory index and page table index get the physical address
     
+    //FIRST LETS CHECK TLB
+    if(tlb_store->count > 0){
+        void* paAddr = check_TLB(va);
+        if(paAddr != NULL){
+            void* offToAdd = (int)va & offset;
+            //printf("offbits of va %d\n", offToAdd);
+            paAddr = paAddr + (int)offToAdd; //adding offset bits to the current addr
+            //printf("pa from TLB %p\n", paAddr);
+            return paAddr;
+        }
+    }
+
+
     //printf("IN TRANSLATE\n");
     int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
     //printf("dir index: %d\n", pgDirIndex);
@@ -122,6 +199,10 @@ pte_t * Translate(pde_t *pgdir, void *va) {
         void* offToAdd = (int)va & offset;
         //printf("offbits of va %d\n", offToAdd);
         currAddr = currAddr + (int)offToAdd; //adding offset bits to the current addr
+
+
+        //ADD TO TLB
+        add_TLB(va, currAddr);
         return currAddr;
     }
 
@@ -266,10 +347,12 @@ void *myalloc(unsigned int num_bytes) {
            printf("v bitmapindex to update: %d\n", vBMIndex);
            vBitMap[vBMIndex] = 1; //in use
 
+           //ADD TO TLB
+           check_TLB(ptrva);
+           add_TLB(ptrva, currPA);     
+
        }
    }
-
-   
 
     return currVA;
 }
@@ -310,7 +393,8 @@ void myfree(void *va, int size) {
         }
         pte_t* currTable = pgdir[pgDirIndex];
 
-        int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
+        //int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
+        int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK) >> offBits;
         printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
         
         void* currpa = currTable[pgTblIndex];
