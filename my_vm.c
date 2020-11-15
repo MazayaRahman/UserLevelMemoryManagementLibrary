@@ -423,7 +423,7 @@ void myfree(void *va, int size) {
 /* The function copies data pointed by "val" to physical
  * memory pages using virtual address (va)
 */
-void PutVal(void *va, void *val, int size) {
+/* void PutVal(void *va, void *val, int size) {
     //printf("PUTVAL\n");
     //printf("the va passed: %p\n", va);
     int v = (int)val;
@@ -431,7 +431,7 @@ void PutVal(void *va, void *val, int size) {
     //printf("the size passed: %d\n", size);
     int numPages = 1;
     if(size > PGSIZE){
-     numPages = ceil((float)size/(float)PGSIZE);;
+     numPages = ceil((float)size/(float)PGSIZE);
      }
      void * vaptr = va;
      void * valptr = val;
@@ -463,11 +463,90 @@ void PutVal(void *va, void *val, int size) {
       // 1. Locate the physical page.
 
 
+
+void PutVal(void *va, void *val, int size) {
+    //vaEnds = the va where we are writing up to
+    void* vaEnds = va + size;
+    int bytesToWrite = size;
+    int numPages = 0;
+    int totalToWrite = size;
+
+    //Check if we start and end on the same page or diff pages, if diff pages, then bytesToWrite is from va to end of current page
+    if((int)va / PGSIZE != (int)vaEnds / PGSIZE){
+        int vInd = (int)va / PGSIZE; //get bitmap index of vitual page
+        void* pgEnds = (vInd)*PGSIZE + PGSIZE; //get addr of where the curr page ends
+        bytesToWrite = pgEnds-va; //bytes from va to end of the curr page
+    }
+
+    int fullPages = size - bytesToWrite; //# of full pages we writing to
+
+    if(fullPages > PGSIZE){
+        numPages = fullPages/PGSIZE;
+    }
+
+    void * vaptr = va;
+    void * valptr = val;
+    for(int i = 0; i <= numPages; i++){
+        // vaptr = va +(PGSIZE* i);
+        // valptr = val+(PGSIZE * i); //CONFIRM THIS??
+        void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
+        memcpy(phyAddr, valptr, bytesToWrite);
+        //va needs to be incremented by how much was written
+        vaptr = vaptr + bytesToWrite;
+        valptr = valptr + bytesToWrite;
+        totalToWrite -= bytesToWrite;
+        if(totalToWrite > PGSIZE){
+            bytesToWrite = PGSIZE;
+        }else{
+            bytesToWrite = totalToWrite;
+        }
+        
+    }
+
 }
 
+void GetVal(void *va, void *val, int size) {
+    void* vaEnds = va + size;
+    int bytesToRead = size;
+    int numPages = 0;
+    int totalToRead = size;
+
+    if((int)va / PGSIZE != (int)vaEnds / PGSIZE){
+        int vInd = (int)va / PGSIZE;
+        void* pgEnds = (vInd)*PGSIZE + PGSIZE;
+        bytesToRead = pgEnds-va;
+    }
+
+    int fullPages = size - bytesToRead;
+
+    if(fullPages > PGSIZE){
+        numPages = fullPages/PGSIZE;
+    }
+
+    void * vaptr = va;
+    void * valptr = val;
+    for(int i = 0; i <= numPages; i++){
+        // vaptr = va +(PGSIZE* i);
+        // valptr = val+(PGSIZE * i); //CONFIRM THIS??
+        void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
+        memcpy(valptr, phyAddr, bytesToRead);
+        //va needs to be incremented by how much was written
+        vaptr = vaptr + bytesToRead;
+        valptr = valptr + bytesToRead;
+        totalToRead -= bytesToRead;
+        if(totalToRead > PGSIZE){
+            bytesToRead = PGSIZE;
+        }else{
+            bytesToRead = totalToRead;
+        }
+        
+    }
+
+
+}
 
 /*Given a virtual address, this function copies the contents of the page to val*/
-void GetVal(void *va, void *val, int size) {
+/* void GetVal(void *va, void *val, int size) {
 int numPages = 1;
  if(size > PGSIZE){
   numPages = ceil((float)size/(float)PGSIZE);
@@ -491,8 +570,6 @@ int numPages = 1;
     If you are implementing TLB,  always check first the presence of translation
     in TLB before proceeding forward */
 
-
-}
 
 
 
