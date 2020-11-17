@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <pthread.h>
 
 int init = 0;
 
@@ -12,6 +13,7 @@ long numVP;
 long numPP;
 int offBits;
 long ppCount;
+
 
 int pgdrBits;
 int pgtblBits;
@@ -24,6 +26,7 @@ int totalRequests = 0;
 int missRequests = 0;
 
 pde_t* pgdir;
+pthread_mutex_t lock;
 /*
 Function responsible for allocating and setting your physical memory 
 */
@@ -76,12 +79,19 @@ void SetPhysicalMem() {
     //Initialize tlb structure
     tlb_store = malloc(sizeof(struct tlb));
     tlb_store->count = 0;
+
+    //Initialize mutexes
+    if(pthread_mutex_init(&lock, NULL) != 0){
+      printf("mutex intialization failed\n");
+
+    }
+
 }
 
 int
 add_TLB(void *va, void *pa)
 {
-
+  pthread_mutex_lock(&lock);
     /*Part 2 HINT: Add a virtual to physical page translation to the TLB */
     if(tlb_store->count < TLB_SIZE){
         struct node* newEntry = malloc(sizeof(struct node));
@@ -94,7 +104,7 @@ add_TLB(void *va, void *pa)
             newEntry->next = tlb_store->head;
             tlb_store->head = newEntry;
         }
-
+	//lock and unlokc here
         newEntry->va = va;
         newEntry->pa = pa;
 
@@ -112,14 +122,14 @@ add_TLB(void *va, void *pa)
         tlb_store->head = tlb_store->tail;
         tlb_store->tail = ptr;
         ptr->next = NULL;
-
+        //lock unlock here
         tlb_store->head->va = va;
         tlb_store->head->pa = pa;
 
         //printf("Added va %p , pa %p to TLB\n", va, pa);
 
     }
-
+    pthread_mutex_unlock(&lock);
     return -1;
 }
 
@@ -128,6 +138,7 @@ check_TLB(void *va) {
 
     /* Part 2: TLB lookup code here */
     //TODO: EXCLUDE OFFBITS WHEN LOOKING?
+  pthread_mutex_lock(&lock);
     void* vaToSearch = (int)va & (~offset);
 
 
@@ -137,6 +148,7 @@ check_TLB(void *va) {
             //found
             //printf("found mapping for %p in TLB\n", va);
             totalRequests++;
+	    pthread_mutex_unlock(&lock);
             return ptr->pa;
         }
         ptr = ptr->next;
@@ -145,6 +157,7 @@ check_TLB(void *va) {
     //not found, must add entry
     missRequests++;
     totalRequests++;
+    pthread_mutex_unlock(&lock);
     return NULL;
 
 }
@@ -187,9 +200,11 @@ pte_t * Translate(pde_t *pgdir, void *va) {
 
 
     //printf("IN TRANSLATE\n");
+    pthread_mutex_lock(&lock);
     int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
     //printf("dir index: %d\n", pgDirIndex);
     if(pgdir[pgDirIndex] == NULL){
+      pthread_mutex_unlock(&lock);
         return NULL;
     }else{
         pte_t* currTable = pgdir[pgDirIndex];
@@ -200,7 +215,7 @@ pte_t * Translate(pde_t *pgdir, void *va) {
         //printf("offbits of va %d\n", offToAdd);
         currAddr = currAddr + (int)offToAdd; //adding offset bits to the current addr
 
-
+	pthread_mutex_unlock(&lock);
         //ADD TO TLB
         add_TLB(va, currAddr);
         return currAddr;
@@ -256,6 +271,7 @@ void *get_next_avail(int num_pages) {
    int count = 0;
    int first = 0;
     printf("Looking for pages, pages needed: %d, numVP: %d\n", num_pages, numVP);
+    pthread_mutex_lock(&lock);
    for(int i = 1; i < numVP; i++){
         if(vBitMap[i] == 0){
             if(count == 0) first = i;
@@ -275,13 +291,15 @@ void *get_next_avail(int num_pages) {
         //need to return the first va
         //first is ur vpn
         void* virtAddr = (first)*PGSIZE;;
-       
+	pthread_mutex_unlock(&lock);
         
         return virtAddr;
     }
     else{
-        return NULL;
+      pthread_mutex_unlock(&lock);
+      return NULL;
     }
+   
 }
 
 void *get_next_avail_phys(int num_pages) {
@@ -291,11 +309,13 @@ void *get_next_avail_phys(int num_pages) {
             break;
         }
     }
+    pthread_mutex_lock(&lock);
 
     // ith page is free
     void* physAddr = i*(PGSIZE) + memory;
     pBitMap[i] = 1; //now it's in use
     ppCount--;
+    pthread_mutex_unlock(&lock);
     return physAddr;
 }
 
@@ -328,9 +348,13 @@ void *myalloc(unsigned int num_bytes) {
    }
 
    //MAP to physical memory
+   pthread_mutex_lock(&lock);
    void * ptrva = currVA;
    if(ppCount < pagesNeeded){
-       return NULL;
+      
+     pthread_mutex_unlock(&lock);
+      return NULL;
+       
    }else{
        for(int i = 0; i < pagesNeeded; i++){
            void* currPA = get_next_avail_phys(1);
@@ -353,7 +377,7 @@ void *myalloc(unsigned int num_bytes) {
 
        }
    }
-
+   pthread_mutex_unlock(&lock);
     return currVA;
 }
 
@@ -377,6 +401,7 @@ void myfree(void *va, int size) {
     }
 
     printf("bytes to free %d", size);
+    pthread_mutex_lock(&lock);
     double pagesNeeded = ceil((float)size/(float)PGSIZE); //TODO: it keeps rounding down, fix later
     printf("pages to free %f\n", pagesNeeded);
 
@@ -413,6 +438,7 @@ void myfree(void *va, int size) {
         ppCount++;
 
     }
+    pthread_mutex_unlock(&lock);
 
 
 
@@ -420,33 +446,8 @@ void myfree(void *va, int size) {
 }
 
 
-/* The function copies data pointed by "val" to physical
- * memory pages using virtual address (va)
-*/
-/* void PutVal(void *va, void *val, int size) {
-    //printf("PUTVAL\n");
-    //printf("the va passed: %p\n", va);
-    int v = (int)val;
-    //printf("the val passed: %d\n", v);
-    //printf("the size passed: %d\n", size);
-    int numPages = 1;
-    if(size > PGSIZE){
-     numPages = ceil((float)size/(float)PGSIZE);
-     }
-     void * vaptr = va;
-     void * valptr = val;
-    for(int i = 0; i< numPages; i++){
-        vaptr = va +(PGSIZE* i);
-        valptr = val+(PGSIZE * i); //CONFIRM THIS??
-        void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
-        //printf("phys addr translated to %p\n", phyAddr);
-       if(size > PGSIZE){
-        memcpy(phyAddr, valptr, PGSIZE);
-        }else{
-        memcpy(phyAddr, valptr, size);
-        //printf("num is %d\n", *(int*)phyAddr);
-        }
-     }
+
+    
 
 
 
@@ -466,6 +467,7 @@ void myfree(void *va, int size) {
 
 void PutVal(void *va, void *val, int size) {
     //vaEnds = the va where we are writing up to
+  pthread_mutex_lock(&lock);
     void* vaEnds = va + size;
     int bytesToWrite = size;
     int numPages = 0;
@@ -502,10 +504,13 @@ void PutVal(void *va, void *val, int size) {
         }
         
     }
+    pthread_mutex_unlock(&lock);
+    
 
 }
 
 void GetVal(void *va, void *val, int size) {
+  pthread_mutex_lock(&lock);
     void* vaEnds = va + size;
     int bytesToRead = size;
     int numPages = 0;
@@ -541,34 +546,10 @@ void GetVal(void *va, void *val, int size) {
         }
         
     }
+    pthread_mutex_unlock(&lock);
 
 
 }
-
-/*Given a virtual address, this function copies the contents of the page to val*/
-/* void GetVal(void *va, void *val, int size) {
-int numPages = 1;
- if(size > PGSIZE){
-  numPages = ceil((float)size/(float)PGSIZE);
- }
- for(int i =0; i<numPages; i++){
-    void * vaptr =va + (i * PGSIZE);
-    void * valptr = val + (i*PGSIZE);
-    void * phyAddr = Translate(pgdir, vaptr);
-    if(size > PGSIZE){
-     memcpy(valptr, phyAddr, PGSIZE);
-    }else{
-    memcpy(valptr, phyAddr, size);
-    }
-
-
- }
-
-
-    /* HINT: put the values pointed to by "va" inside the physical memory at given
-    "val" address. Assume you can access "val" directly by derefencing them.
-    If you are implementing TLB,  always check first the presence of translation
-    in TLB before proceeding forward */
 
 
 
