@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include<string.h>
 
 int init = 0;
 
@@ -34,9 +35,9 @@ void SetPhysicalMem() {
 
     //Allocate physical memory using mmap or malloc; this is the total size of
     //your memory you are simulating
-    printf("INITIALIZING LIBRARY\n");
+
     memory = malloc(sizeof(char)* MEMSIZE);
-    printf("pm start at %p\n", memory);
+
 
     
     //HINT: Also calculate the number of physical and virtual pages and allocate
@@ -45,7 +46,7 @@ void SetPhysicalMem() {
     offBits = log2(PGSIZE); //offset bits based on pagesize
     offset = offset <<  offBits; //offset bits as an int
     offset = ~offset;
-    printf("the offset mask is %d\n", offset);
+
      
     numVP = MAX_MEMSIZE / PGSIZE; //# of virtual pages
     numPP = MEMSIZE / PGSIZE; //# of physical pages
@@ -68,13 +69,13 @@ void SetPhysicalMem() {
 
     pgtblBits = 32-pgdrBits-offBits; //10
     PG_DIR_MASK = PG_DIR_MASK << (32-pgdrBits);
-    printf("pgdir mask: %d\n", PG_DIR_MASK);
+
 
     unsigned int dirMaskFlip = ~PG_DIR_MASK;
-    printf("initial mask: %d\n", PG_TBL_MASK);
+
     PG_TBL_MASK = PG_TBL_MASK << offBits;
     PG_TBL_MASK = dirMaskFlip & PG_TBL_MASK;
-    printf("final masl: %d\n", PG_TBL_MASK);
+
 
     //Initialize tlb structure
     tlb_store = malloc(sizeof(struct tlb));
@@ -85,8 +86,7 @@ void SetPhysicalMem() {
       printf("mutex intialization failed\n");
 
     }
-    printf("Lock initialized %d\n", lock);
-    printf("threadId: %d\n", pthread_self());
+
 
 }
 
@@ -111,7 +111,7 @@ add_TLB(void *va, void *pa)
 
         tlb_store->count++;
 
-        //printf("Added va %p , pa %p to TLB\n", va, pa);
+
     }
     else{
         struct node* ptr = tlb_store->head;
@@ -123,11 +123,9 @@ add_TLB(void *va, void *pa)
         tlb_store->head = tlb_store->tail;
         tlb_store->tail = ptr;
         ptr->next = NULL;
-        //lock unlock here
+
         tlb_store->head->va = va;
         tlb_store->head->pa = pa;
-
-        //printf("Added va %p , pa %p to TLB\n", va, pa);
 
     }
     return -1;
@@ -137,15 +135,14 @@ pte_t *
 check_TLB(void *va) {
 
     /* Part 2: TLB lookup code here */
-    //TODO: EXCLUDE OFFBITS WHEN LOOKING?
-    void* vaToSearch = (int)va & (~offset);
+
+  void* vaToSearch =(void*)((int)va & (~offset));
 
 
     struct node* ptr = tlb_store->head;
     while(ptr != NULL){
         if(ptr->va == vaToSearch){
             //found
-            //printf("found mapping for %p in TLB\n", va);
             totalRequests++;
             return ptr->pa;
         }
@@ -164,12 +161,7 @@ void print_TLB_missrate(){
   double miss_rate = 0;
   printf("total req: %d\n", totalRequests);
   printf("miss req: %d\n", missRequests);
-
-    
   miss_rate = (float)missRequests/(float)totalRequests;
-  printf("MISS RATE %f\n", miss_rate);
-
-
   fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
 }
 
@@ -187,29 +179,20 @@ pte_t * Translate(pde_t *pgdir, void *va) {
     if(tlb_store->count > 0){
         void* paAddr = check_TLB(va);
         if(paAddr != NULL){
-            void* offToAdd = (int)va & offset;
-            //printf("offbits of va %d\n", offToAdd);
+	  void* offToAdd = (void*)((int)va & offset);
             paAddr = paAddr + (int)offToAdd; //adding offset bits to the current addr
-            //printf("pa from TLB %p\n", paAddr);
             return paAddr;
         }
     }
-
-
-    //printf("IN TRANSLATE\n");
     int pgDirIndex = ((int)va & PG_DIR_MASK); //HOW TO WORK WITH VOID* address
-    //printf("dir index: %d\n", pgDirIndex);
     if(pgdir[pgDirIndex] == NULL){
         return NULL;
     }else{
         pte_t* currTable = pgdir[pgDirIndex];
         int pgTblIndex = ((int)va & PG_TBL_MASK) >> offBits;
-        //printf("table index: %d\n", pgTblIndex);
         void * currAddr = currTable[pgTblIndex];
-        void* offToAdd = (int)va & offset;
-        //printf("offbits of va %d\n", offToAdd);
+        void* offToAdd = (void*)((int)va & offset);
         currAddr = currAddr + (int)offToAdd; //adding offset bits to the current addr
-
         //ADD TO TLB
         add_TLB(va, currAddr);
         return currAddr;
@@ -237,7 +220,6 @@ PageMap(pde_t *pgdir, void *va, void *pa)
     virtual to physical mapping */
 
     int pgDirIndex = ((int)va & PG_DIR_MASK);
-    printf("pgdir: %d\n", pgDirIndex);
     if(pgdir[pgDirIndex] == NULL){
         //need to allocate a page table
         pgdir[pgDirIndex] = malloc(sizeof(pte_t)*pow(2,pgtblBits));
@@ -245,12 +227,7 @@ PageMap(pde_t *pgdir, void *va, void *pa)
     pte_t* currTable = pgdir[pgDirIndex];
 
     int pgTblIndex = ((unsigned int)va & PG_TBL_MASK) >> offBits;
-    printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
     currTable[pgTblIndex] = pa;
-    printf("pm mapped! pgdir: %d, pgtbl: %d with %p\n", pgDirIndex, pgTblIndex, currTable[pgTblIndex]);
-
-
-
     return -1;
 }
 
@@ -264,14 +241,12 @@ void *get_next_avail(int num_pages) {
    int found = 0;
    int count = 0;
    int first = 0;
-    printf("Looking for pages, pages needed: %d, numVP: %d\n", num_pages, numVP);
    for(int i = 1; i < numVP; i++){
         if(vBitMap[i] == 0){
             if(count == 0) first = i;
             count++;
             if(count == num_pages){
                 //your done
-                printf("pages found in vm\n");
                 found = 1;
                 break;
             }
@@ -283,7 +258,7 @@ void *get_next_avail(int num_pages) {
     if(found = 1){
         //need to return the first va
         //first is ur vpn
-        void* virtAddr = (first)*PGSIZE;;
+      void* virtAddr =(void*)((first)*PGSIZE);
         
         return virtAddr;
     }
@@ -314,8 +289,6 @@ and used by the benchmark
 */
 void *myalloc(unsigned int num_bytes) {
     pthread_mutex_lock(&lock);
-    printf("MYALLOC CALLED\n");
-    printf("threadId: %d\n", pthread_self());
     //HINT: If the physical memory is not yet initialized, then allocate and initialize.
     if(init == 0){
         SetPhysicalMem();
@@ -326,22 +299,14 @@ void *myalloc(unsigned int num_bytes) {
    page directory. Next, using get_next_avail(), check if there are free pages. If
    free pages are available, set the bitmaps and map a new page. Note, you will 
    have to mark which physical pages are used. */
-    printf("bytes wanted %d\n", num_bytes);
 
-    //LOCKING MUTEX HERE~~~
-   float pagesNeeded = ceil((float)num_bytes/(float)PGSIZE); //TODO: it keeps rounding down, fix later
-   printf("pages needed %f\n", pagesNeeded);
     
-    //printf("threadId: %d\n", pthread_self());
-    printf("lock status %d\n", lock);
+   float pagesNeeded = ceil((float)num_bytes/(float)PGSIZE); //TODO: it keeps rounding down, fix later
 
    void* currVA = get_next_avail((int)pagesNeeded);
    if(currVA == NULL){
-       printf("Not enough memory\n");
-   }else{
-       printf("vm found! at %p\n", currVA);
+     return NULL; //Not enough memory
    }
-    printf("threadId: %d\n", pthread_self());
    //MAP to physical memory
    void * ptrva = currVA;
    if(ppCount < pagesNeeded){
@@ -351,8 +316,6 @@ void *myalloc(unsigned int num_bytes) {
    }else{
        for(int i = 0; i < pagesNeeded; i++){
            void* currPA = get_next_avail_phys(1);
-           printf("pm found! at %p\n", currPA);
-
            //currVA = (int)currVA * i;
            ptrva=  currVA + (i * PGSIZE);
 
@@ -361,7 +324,6 @@ void *myalloc(unsigned int num_bytes) {
            PageMap(pgdir, ptrva, currPA);
 
            int vBMIndex = (int)ptrva / PGSIZE;
-           printf("v bitmapindex to update: %d\n", vBMIndex);
            vBitMap[vBMIndex] = 1; //in use
 
            //ADD TO TLB
@@ -382,52 +344,34 @@ void myfree(void *va, int size) {
     // Also mark the pages free in the bitmap
     //Only free if the memory from "va" to va+size is valid
 
-    // 1. use size to see how many pages would need to be freed -> count
-    // 2. use va to get pgdir index, and pg table index
-    // 3. for count pages, get va and go to that entry in pg table and null it out
-    // 4. 0 the corresponding entries in both bitmaps
-    // 5. rmbr to increment ppCount when freeing phsysical pages.
-    printf("VA to free %p\n", va);
     if((int)va +size > MAX_MEMSIZE){
         printf("Invalid free\n");
         pthread_mutex_unlock(&lock);
-        return NULL;
+        return;
     }
 
-    printf("bytes to free %d", size);
     double pagesNeeded = ceil((float)size/(float)PGSIZE); //TODO: it keeps rounding down, fix later
-    printf("pages to free %f\n", pagesNeeded);
-
     void * ptrva = va;
 
     for(int i = 0; i < pagesNeeded; i++){
         ptrva=  va + (i * PGSIZE);
 
         int pgDirIndex = ((int)ptrva & PG_DIR_MASK);
-        printf("pgdir: %d\n", pgDirIndex);
         if(pgdir[pgDirIndex] == NULL){
             //nothing to free there..
             pthread_mutex_unlock(&lock);
-            return NULL;
+            return;
         }
         pte_t* currTable = pgdir[pgDirIndex];
-
-        //int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK);
         int pgTblIndex = ((unsigned int)ptrva & PG_TBL_MASK) >> offBits;
-        printf("tblmask: %d, tblIndex: %d\n", PG_TBL_MASK, pgTblIndex);
         
         void* currpa = currTable[pgTblIndex];
         currTable[pgTblIndex] = NULL;
-        //TODO: Do we also have to clear out the space in physical memory, or just let the user overwrite? No
-
-        printf("pm unmapped! pgdir: %d, pgtbl: %d previously had %p\n", pgDirIndex, pgTblIndex, currpa);
 
         int vBMIndex = (int)ptrva / PGSIZE;
-        printf("v bitmapindex to update: %d\n", vBMIndex);
         vBitMap[vBMIndex] = 0; //now free
 
         int pBMIndex = ((int)currpa - (int)memory)/PGSIZE;
-        printf("p bitmapindex to update: %d\n", pBMIndex);
         pBitMap[pBMIndex] = 0; //now free
         ppCount++;
 
@@ -439,27 +383,8 @@ void myfree(void *va, int size) {
 }
 
 
-
-    
-
-
-
-    //first check if the size is larger than the pageSize.
-    //if it then see how many pages that is.
-    //use translate to map each page from VA to PA.
-
-
-
-    /* HINT: Using the virtual address and Translate(), find the physical page. Copy
-       the contents of "val" to a physical page. NOTE: The "size" value can be larger
-       than one page. Therefore, you may have to find multiple pages using Translate()
-       function.*/
-      // 1. Locate the physical page.
-
-
-
 void PutVal(void *va, void *val, int size) {
-    //vaEnds = the va where we are writing up to
+    
     pthread_mutex_lock(&lock);
     void* vaEnds = va + size;
     int bytesToWrite = size;
@@ -469,7 +394,10 @@ void PutVal(void *va, void *val, int size) {
     //Check if we start and end on the same page or diff pages, if diff pages, then bytesToWrite is from va to end of current page
     if((int)va / PGSIZE != (int)vaEnds / PGSIZE){
         int vInd = (int)va / PGSIZE; //get bitmap index of vitual page
-        void* pgEnds = (vInd)*PGSIZE + PGSIZE; //get addr of where the curr page ends
+	
+	void* pgEnds =(void*)( (vInd)*PGSIZE + PGSIZE); //get addr of where the curr page ends
+	//	int* temp = (vInd)*PGSIZE + PGSIZE;
+	//void * pgEnds = &temp;
         bytesToWrite = pgEnds-va; //bytes from va to end of the curr page
     }
 
@@ -482,8 +410,6 @@ void PutVal(void *va, void *val, int size) {
     void * vaptr = va;
     void * valptr = val;
     for(int i = 0; i <= numPages; i++){
-        // vaptr = va +(PGSIZE* i);
-        // valptr = val+(PGSIZE * i); //CONFIRM THIS??
         void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
         memcpy(phyAddr, valptr, bytesToWrite);
         //va needs to be incremented by how much was written
@@ -511,7 +437,7 @@ void GetVal(void *va, void *val, int size) {
 
     if((int)va / PGSIZE != (int)vaEnds / PGSIZE){
         int vInd = (int)va / PGSIZE;
-        void* pgEnds = (vInd)*PGSIZE + PGSIZE;
+        void* pgEnds =(void*)((vInd)*PGSIZE + PGSIZE);
         bytesToRead = pgEnds-va;
     }
 
@@ -524,8 +450,6 @@ void GetVal(void *va, void *val, int size) {
     void * vaptr = va;
     void * valptr = val;
     for(int i = 0; i <= numPages; i++){
-        // vaptr = va +(PGSIZE* i);
-        // valptr = val+(PGSIZE * i); //CONFIRM THIS??
         void * phyAddr = Translate(pgdir, vaptr); //getting the physical addr
         memcpy(valptr, phyAddr, bytesToRead);
         //va needs to be incremented by how much was written
@@ -561,26 +485,7 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     store the result to the "answer array"*/
 
 
-    int x;
-    printf("matrix 1\n");
-    for(int r =0; r< size; r++){
-        for(int s =0; s<size;s++){
-            //GetVal(mat1+(r*size+s), &x, sizeof(int));
-            GetVal((unsigned int)mat1 + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
-            printf("%d ", x);
-	    }
-	    printf("\n");
-    }
-
-    printf("matrix 2\n");
-    for(int r =0; r< size; r++){
-        for(int s =0; s<size;s++){
-            //GetVal(mat2+(r*size+s), &x, sizeof(int));
-            GetVal((unsigned int)mat2 + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
-            printf("%d ", x);
-	    }
-	    printf("\n");
-    }
+   
     int zero = 0;
     int currAnsElement;
     int m1Element;
@@ -588,35 +493,22 @@ void MatMult(void *mat1, void *mat2, int size, void *answer) {
     int ansElement;
     for(int i =0; i< size; i++){
         for(int j =0; j<size; j++){
-  
-            //PutVal(answer+(i*size + j), &zero, sizeof(int));
-            PutVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &zero, sizeof(int));
+	  PutVal((void*)((unsigned int)answer) + ((i * size * sizeof(int))) + (j * sizeof(int)), &zero, sizeof(int));
             for(int k =0; k <size; k++){
-                //GetVal(answer+(i*size + j), &currAnsElement, sizeof(int));
-                GetVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &currAnsElement, sizeof(int));
-                //printf("c %d ", currAnsElement);
-                //GetVal(mat1+(i*size + k), &m1Element, sizeof(int));
-                GetVal((unsigned int)mat1 + ((i * size * sizeof(int))) + (k * sizeof(int)), &m1Element, sizeof(int));
-                
-                //GetVal(mat2+(k*size + j), &m2Element, sizeof(int));
-                GetVal((unsigned int)mat2 + ((k * size * sizeof(int))) + (j * sizeof(int)), &m2Element, sizeof(int));
+	      GetVal((void*)((unsigned int)answer) + ((i * size * sizeof(int))) + (j * sizeof(int)), &currAnsElement, sizeof(int));
+
+	      GetVal((void*)((unsigned int)mat1) + ((i * size * sizeof(int))) + (k * sizeof(int)), &m1Element, sizeof(int));
+
+	      GetVal((void*)((unsigned int)mat2) + ((k * size * sizeof(int))) + (j * sizeof(int)), &m2Element, sizeof(int));
                 ansElement = currAnsElement + (m1Element*m2Element);
 
-                //PutVal(answer+(i*size + j), &ansElement, sizeof(int));
-                PutVal((unsigned int)answer + ((i * size * sizeof(int))) + (j * sizeof(int)), &ansElement, sizeof(int));
+                
+                PutVal((void*)((unsigned int)answer) + ((i * size * sizeof(int))) + (j * sizeof(int)), &ansElement, sizeof(int));
 
             }
         }
     }
-
-    printf("ans matrix\n");
-    for(int r =0; r< size; r++){
-        for(int s =0; s<size;s++){
-            //GetVal(answer+(r*size+s), &x, sizeof(int));
-            GetVal((unsigned int)answer + ((r * size * sizeof(int))) + (s * sizeof(int)), &x, sizeof(int));
-            printf("%d ", x);
-	    }
-	    printf("\n");
-    }
+    
+    
  
 }

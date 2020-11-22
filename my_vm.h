@@ -21,7 +21,7 @@ typedef void* pte_t;
 // Represents a page directory entry
 typedef pte_t* pde_t;
 
-#define TLB_SIZE 120
+#define TLB_SIZE 240
 
 struct node {
     void* va;
@@ -51,5 +51,6 @@ void myfree(void *va, int size);
 void PutVal(void *va, void *val, int size);
 void GetVal(void *va, void *val, int size);
 void MatMult(void *mat1, void *mat2, int size, void *answer);
+void print_TLB_missrate();
 
 #endif
