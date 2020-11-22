@@ -21,7 +21,7 @@ typedef void* pte_t;
 // Represents a page directory entry
 typedef pte_t* pde_t;
 
-#define TLB_SIZE 240
+#define TLB_SIZE 120
 
 struct node {
     void* va;

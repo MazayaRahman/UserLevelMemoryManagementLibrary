@@ -159,8 +159,8 @@ check_TLB(void *va) {
 
 void print_TLB_missrate(){
   double miss_rate = 0;
-  printf("total req: %d\n", totalRequests);
-  printf("miss req: %d\n", missRequests);
+  //printf("total requests: %d\n", totalRequests);
+  //printf("miss requests: %d\n", missRequests);
   miss_rate = (float)missRequests/(float)totalRequests;
   fprintf(stderr, "TLB miss rate %lf \n", miss_rate);
 }
